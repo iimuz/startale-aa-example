@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAccount, useConnect, useDisconnect, useWalletClient } from "wagmi";
+import { useAccount, useConnect, useDisconnect, useWalletClient, useSwitchChain } from "wagmi";
 import {
   toStartaleSmartAccount,
   createStartaleAccountClient,
@@ -28,10 +28,14 @@ const CounterABI = [
 ] as const;
 
 function StartaleAccount() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
+  const { switchChain } = useSwitchChain();
   const { data: walletClient } = useWalletClient();
+
+  // Check if connected to the correct network
+  const isCorrectNetwork = chain?.id === soneiumMinato.id;
 
   const [smartAccount, setSmartAccount] = useState<StartaleSmartAccount | null>(null);
   const [accountClient, setAccountClient] = useState<StartaleAccountClient | null>(null);
@@ -162,9 +166,27 @@ function StartaleAccount() {
         {isConnected ? (
           <div>
             <p>✅ Connected: {address}</p>
-            {smartAccount && (
+            {chain && (
+              <p>Network: {chain.name} (Chain ID: {chain.id})</p>
+            )}
+
+            {/* Network Switch Warning */}
+            {!isCorrectNetwork && (
+              <div className="warning">
+                <p>⚠️ Wrong Network! Please switch to Soneium Minato</p>
+                <button
+                  onClick={() => switchChain({ chainId: soneiumMinato.id })}
+                  className="primary"
+                >
+                  Switch to Soneium Minato
+                </button>
+              </div>
+            )}
+
+            {isCorrectNetwork && smartAccount && (
               <p className="address">Smart Account: {smartAccount.address}</p>
             )}
+
             <button onClick={() => disconnect()} disabled={isLoading}>
               Disconnect
             </button>
@@ -188,7 +210,7 @@ function StartaleAccount() {
       </div>
 
       {/* Counter Interaction Section */}
-      {isConnected && smartAccount && accountClient && (
+      {isConnected && isCorrectNetwork && smartAccount && accountClient && (
         <div className="card">
           <h2>2. Interact with Counter Contract</h2>
           <p>Contract: {AA_CONFIG.COUNTER_CONTRACT_ADDRESS}</p>
