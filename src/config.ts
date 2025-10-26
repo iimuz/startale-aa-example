@@ -1,10 +1,18 @@
 import type { Address } from "viem";
 import { soneiumMinato } from "viem/chains";
 import { createConfig, http } from "wagmi";
+import { injected, walletConnect } from "@wagmi/connectors";
 
 // Wagmi configuration for Soneium Minato testnet
 export const config = createConfig({
   chains: [soneiumMinato],
+  connectors: [
+    injected(), // MetaMask, Coinbase Wallet, etc.
+    walletConnect({
+      projectId: "YOUR_WALLETCONNECT_PROJECT_ID", // Get from https://cloud.walletconnect.com
+      showQrModal: true,
+    }),
+  ],
   transports: {
     [soneiumMinato.id]: http(),
   },

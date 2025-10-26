@@ -8,24 +8,26 @@
 
 ### 主な機能
 
-- 🔐 **Dynamic Labs** によるウォレット接続
+- 🔐 **wagmi** によるウォレット接続（MetaMask、WalletConnect等）
 - 🎯 **Smart Account** の作成と管理
 - ⛽ **Paymaster** によるガス代の代理支払い
 - 📝 **Counter Contract** との連携（インクリメント操作）
 
 ## 必要な事前準備
 
-### 1. Dynamic Labs Environment ID の取得
-
-1. [Dynamic Labs](https://app.dynamic.xyz/) にアクセス
-2. アカウント作成とプロジェクトの作成
-3. Environment ID を取得
-
-### 2. Soneium Portal での Paymaster 設定
+### Soneium Portal での Paymaster 設定
 
 1. [Soneium Portal](https://portal.soneium.org/) にアクセス
 2. Paymaster を作成
 3. Bundler URL と Paymaster URL、API キーを取得
+
+### (オプション) WalletConnect Project ID の取得
+
+WalletConnectを使用する場合：
+
+1. [WalletConnect Cloud](https://cloud.walletconnect.com) にアクセス
+2. プロジェクトを作成
+3. Project ID を取得
 
 ## セットアップ手順
 
@@ -37,15 +39,23 @@ npm install
 
 ### 2. 設定ファイルの編集
 
-#### src/App.tsx
-
-```typescript
-environmentId: "YOUR_DYNAMIC_ENVIRONMENT_ID", // <- ここを書き換え
-```
-
 #### src/config.ts
 
 ```typescript
+export const config = createConfig({
+  chains: [soneiumMinato],
+  connectors: [
+    injected(), // MetaMask等
+    walletConnect({
+      projectId: "YOUR_WALLETCONNECT_PROJECT_ID", // <- WalletConnect使用時に書き換え
+      showQrModal: true,
+    }),
+  ],
+  transports: {
+    [soneiumMinato.id]: http(),
+  },
+});
+
 export const AA_CONFIG = {
   MINATO_RPC: "https://rpc.minato.soneium.org",
   BUNDLER_URL: "YOUR_BUNDLER_URL",           // <- ここを書き換え
@@ -66,9 +76,9 @@ npm run dev
 
 ### 1. ウォレット接続
 
-- "Connect Wallet" ボタンをクリック
-- Dynamic Labs のモーダルからウォレットを選択して接続
-- 接続後、Smart Account アドレスが表示される
+- 利用可能なコネクターボタン（Injected、WalletConnect等）をクリック
+- ウォレットで接続を承認
+- 接続後、EOAアドレスとSmart Accountアドレスが表示される
 
 ### 2. Counter Contract の操作
 
@@ -98,16 +108,53 @@ startale-aa-example/
 ## 主要な依存関係
 
 - **@startale-scs/aa-sdk**: Startale Smart Account SDK
-- **@dynamic-labs/sdk-react-core**: ウォレット接続
 - **wagmi**: Ethereum インタラクション
+- **@wagmi/connectors**: ウォレットコネクター（MetaMask、WalletConnect等）
 - **viem**: Ethereum ユーティリティ
 - **@tanstack/react-query**: データフェッチング
 
 ## 実装のポイント
 
+### Wagmi Config でコネクターを設定
+
+```typescript
+import { injected, walletConnect } from "@wagmi/connectors";
+
+export const config = createConfig({
+  chains: [soneiumMinato],
+  connectors: [
+    injected(), // MetaMask, Coinbase Wallet, etc.
+    walletConnect({
+      projectId: "YOUR_WALLETCONNECT_PROJECT_ID",
+      showQrModal: true,
+    }),
+  ],
+  transports: {
+    [soneiumMinato.id]: http(),
+  },
+});
+```
+
+### ウォレット接続
+
+```typescript
+const { address, isConnected } = useAccount();
+const { connect, connectors } = useConnect();
+const { disconnect } = useDisconnect();
+
+// 接続
+connectors.map((connector) => (
+  <button onClick={() => connect({ connector })}>
+    {connector.name}
+  </button>
+))
+```
+
 ### Smart Account の作成
 
 ```typescript
+const { data: walletClient } = useWalletClient();
+
 const account = await toStartaleSmartAccount({
   client: walletClient,
   signer: walletClient.account,
@@ -149,8 +196,8 @@ const hash = await accountClient.sendUserOperation({
 
 ### ウォレット接続エラー
 
-- Dynamic Labs の Environment ID が正しいか確認
 - ブラウザでウォレット拡張機能が有効か確認
+- WalletConnect使用時はProject IDが正しいか確認
 
 ### ネットワークエラー
 
@@ -161,7 +208,8 @@ const hash = await accountClient.sendUserOperation({
 
 - [Startale AA Documentation](https://docs.startale.com/account-abstraction/)
 - [Soneium Portal](https://portal.soneium.org/)
-- [Dynamic Labs](https://app.dynamic.xyz/)
+- [WalletConnect Cloud](https://cloud.walletconnect.com)
+- [wagmi Documentation](https://wagmi.sh/)
 - [Startale AA Demo (Next.js)](https://github.com/StartaleLabs/aa-demo-next)
 
 ## ライセンス

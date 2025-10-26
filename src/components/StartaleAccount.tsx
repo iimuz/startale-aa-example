@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
-import { useWalletClient } from "wagmi";
+import { useAccount, useConnect, useDisconnect, useWalletClient } from "wagmi";
 import {
   toStartaleSmartAccount,
   createStartaleAccountClient,
@@ -29,8 +28,9 @@ const CounterABI = [
 ] as const;
 
 function StartaleAccount() {
-  const { setShowAuthFlow, user, handleLogOut } = useDynamicContext();
-  const isLoggedIn = useIsLoggedIn();
+  const { address, isConnected } = useAccount();
+  const { connect, connectors } = useConnect();
+  const { disconnect } = useDisconnect();
   const { data: walletClient } = useWalletClient();
 
   const [smartAccount, setSmartAccount] = useState<StartaleSmartAccount | null>(null);
@@ -159,25 +159,36 @@ function StartaleAccount() {
       {/* Login Section */}
       <div className="card">
         <h2>1. Connect Wallet</h2>
-        {isLoggedIn ? (
+        {isConnected ? (
           <div>
-            <p>✅ Connected: {user?.email || "User"}</p>
+            <p>✅ Connected: {address}</p>
             {smartAccount && (
               <p className="address">Smart Account: {smartAccount.address}</p>
             )}
-            <button onClick={handleLogOut} disabled={isLoading}>
-              Logout
+            <button onClick={() => disconnect()} disabled={isLoading}>
+              Disconnect
             </button>
           </div>
         ) : (
-          <button onClick={() => setShowAuthFlow(true)}>
-            Connect Wallet
-          </button>
+          <div>
+            <p>Connect your wallet to get started</p>
+            <div className="connector-buttons">
+              {connectors.map((connector) => (
+                <button
+                  key={connector.id}
+                  onClick={() => connect({ connector })}
+                  disabled={isLoading}
+                >
+                  {connector.name}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
       {/* Counter Interaction Section */}
-      {isLoggedIn && smartAccount && accountClient && (
+      {isConnected && smartAccount && accountClient && (
         <div className="card">
           <h2>2. Interact with Counter Contract</h2>
           <p>Contract: {AA_CONFIG.COUNTER_CONTRACT_ADDRESS}</p>
@@ -218,10 +229,9 @@ function StartaleAccount() {
       <div className="card info">
         <h3>⚠️ Setup Required</h3>
         <ol>
-          <li>Get a Dynamic Labs environment ID at <a href="https://app.dynamic.xyz/" target="_blank" rel="noopener noreferrer">app.dynamic.xyz</a></li>
           <li>Set up Paymaster at <a href="https://portal.soneium.org/" target="_blank" rel="noopener noreferrer">portal.soneium.org</a></li>
-          <li>Update <code>src/config.ts</code> with your credentials</li>
-          <li>Update <code>src/App.tsx</code> with your Dynamic environment ID</li>
+          <li>Update <code>src/config.ts</code> with your Bundler and Paymaster URLs</li>
+          <li>(Optional) Get WalletConnect Project ID at <a href="https://cloud.walletconnect.com" target="_blank" rel="noopener noreferrer">cloud.walletconnect.com</a></li>
         </ol>
       </div>
     </div>
