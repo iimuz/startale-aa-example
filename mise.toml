@@ -1,0 +1,6 @@
+[tools]
+nodejs = "22"
+
+[env]
+mise.file = ".env"
+
