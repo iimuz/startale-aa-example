@@ -112,13 +112,15 @@ aa-backend-sample/
 
 ### Frontend (React + RSBuild)
 
+**注意**: `viem`と`wagmi`は互換性のため厳密なバージョン指定が必要
+
 ```json
 {
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "viem": "^2.30.6",
-    "wagmi": "^2.5.7",
+    "viem": "2.30.6",
+    "wagmi": "2.5.7",
     "@startale-scs/aa-sdk": "^1.0.9",
     "@tanstack/react-query": "^5.17.0"
   },
@@ -185,14 +187,14 @@ npm run dev
 
 ```bash
 # API
-VITE_API_URL=http://localhost:3001
+PUBLIC_API_URL=http://localhost:3001
 
 # Network
-VITE_CHAIN_ID=1946
-VITE_RPC_URL=https://rpc.minato.soneium.org
+PUBLIC_CHAIN_ID=1946
+PUBLIC_RPC_URL=https://rpc.minato.soneium.org
 
 # WalletConnect (optional)
-VITE_WALLETCONNECT_PROJECT_ID=your_project_id
+PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
 ```
 
 ---
@@ -395,18 +397,24 @@ VITE_WALLETCONNECT_PROJECT_ID=your_project_id
 
 ### Phase 2: Frontend実装
 
-1. **RSBuildプロジェクト作成**
+1. ✅ **RSBuildプロジェクト作成** (完了: 2025-11-01)
    ```bash
    cd ../frontend
    npm create rsbuild@latest
    # 選択: React, TypeScript
-   npm install viem wagmi @startale-scs/aa-sdk @tanstack/react-query
+   npm install viem@2.30.6 wagmi@2.5.7 @startale-scs/aa-sdk @tanstack/react-query
    ```
 
-2. **RSBuild設定**
-   - `rsbuild.config.ts`: ビルド設定とプラグイン
-   - 環境変数の読み込み設定
+   **注意**: バージョン互換性のため、以下の厳密なバージョンを使用
+   - `viem`: `2.30.6` (固定)
+   - `wagmi`: `2.5.7` (固定)
 
+2. ✅ **RSBuild設定** (完了: 2025-11-01)
+   - ✅ `rsbuild.config.ts`: ビルド設定とプラグイン
+   - ✅ `.env.example`: RSBuild用環境変数（`PUBLIC_`プレフィックス使用）
+   - ✅ `src/index.html`: HTMLテンプレート作成
+
+   **rsbuild.config.ts**:
    ```typescript
    import { defineConfig } from '@rsbuild/core';
    import { pluginReact } from '@rsbuild/plugin-react';
@@ -422,11 +430,20 @@ VITE_WALLETCONNECT_PROJECT_ID=your_project_id
    });
    ```
 
-3. **Wagmi設定**
-   - `src/App.tsx`: WagmiConfig設定
-   - Soneiumチェーン追加
+   **.env.example** (RSBuild用に`PUBLIC_`プレフィックスを使用):
+   ```bash
+   PUBLIC_API_URL=http://localhost:3001
+   PUBLIC_CHAIN_ID=1946
+   PUBLIC_RPC_URL=https://rpc.minato.soneium.org
+   PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
+   ```
 
-4. **SmartAccount Hook実装**
+3. ✅ **Wagmi設定** (完了: 2025-11-01)
+   - ✅ `src/App.tsx`: WagmiConfig設定、Soneium Minatoチェーン定義
+   - ✅ `WagmiProvider`と`QueryClientProvider`でラップ
+   - ✅ `injected`コネクタ設定
+
+4. ⬜ **SmartAccount Hook実装** (未実装)
    - `src/hooks/useSmartAccount.ts`
    - `toStartaleSmartAccount`でアカウント作成
    - `sendUserOperation`関数実装
