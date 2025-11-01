@@ -328,14 +328,14 @@ VITE_WALLETCONNECT_PROJECT_ID=your_project_id
 
 ### Phase 1: Backend 基盤実装
 
-1. **プロジェクトセットアップ**
+1. ✅ **プロジェクトセットアップ** (完了: 2025-11-01)
    ```bash
    mkdir aa-backend-sample
    cd aa-backend-sample
    mkdir backend frontend
    ```
 
-2. **Backend初期化**
+2. ✅ **Backend初期化** (完了: 2025-11-01)
    ```bash
    cd backend
    npm init -y
@@ -367,29 +367,29 @@ VITE_WALLETCONNECT_PROJECT_ID=your_project_id
    .DS_Store
    ```
 
-3. **Express基本サーバー作成**
+3. ✅ **Express基本サーバー作成** (完了: 2025-11-01)
    - `src/index.ts`: サーバーエントリーポイント
    - CORS設定
    - エラーハンドリングミドルウェア
    - 環境変数は `process.env` から直接読み込み（dotenv不要）
 
-4. **Paymaster Service実装**
+4. ⬜ **Paymaster Service実装** (未実装)
    - `src/services/paymasterService.ts`
    - `createSCSPaymasterClient`でクライアント作成
    - `sponsorUserOperation`メソッド実装
 
-5. **Bundler Service実装**
+5. ⬜ **Bundler Service実装** (未実装)
    - `src/services/bundlerService.ts`
    - `createBundlerClient`でクライアント作成
    - `sendUserOperation`メソッド実装
    - `getUserOperationReceipt`メソッド実装
 
-6. **UserOperation Route実装**
+6. ⬜ **UserOperation Route実装** (未実装)
    - `src/routes/userOperation.ts`
    - POST `/api/user-operations` エンドポイント
    - GET `/api/user-operations/:hash` エンドポイント
 
-7. **Validation実装**
+7. ⬜ **Validation実装** (未実装)
    - Zodスキーマ定義
    - リクエストバリデーションミドルウェア
 
