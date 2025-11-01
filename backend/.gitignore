@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dev.sh
+.envrc
+.env
+.env.local
+*.log
+.DS_Store

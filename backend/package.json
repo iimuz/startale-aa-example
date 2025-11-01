@@ -1,0 +1,29 @@
+{
+  "name": "aa-backend-sample",
+  "version": "1.0.0",
+  "description": "Account Abstraction Backend Sample for Soneium",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "viem": "^2.30.6",
+    "@startale-scs/aa-sdk": "^1.0.9",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/cors": "^2.8.19",
+    "@types/node": "^24.9.2",
+    "typescript": "^5.9.3",
+    "tsx": "^4.20.6"
+  }
+}
