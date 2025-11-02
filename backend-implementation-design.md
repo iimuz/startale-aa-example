@@ -326,6 +326,153 @@ PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
 
 ---
 
+## 📐 実装方針の詳細
+
+### アーキテクチャ選択: Frontend署名 → Backend Paymaster連携 → Backend Bundler送信
+
+このプロジェクトでは、以下の方針で実装する：
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Frontend (React)                                        │
+│                                                          │
+│ 1. SmartAccountClientでUserOperation作成               │
+│    ※ paymaster設定なし（通常のRPC使用）                │
+│ 2. ユーザーの秘密鍵でUserOperationに署名               │
+│ 3. 署名済みUserOpをBackendに送信                       │
+└───────────────┬─────────────────────────────────────────┘
+                │ POST /api/user-operations
+                │ { userOp, chainId }
+                ↓
+┌─────────────────────────────────────────────────────────┐
+│ Backend (Express)                                       │
+│                                                          │
+│ 1. 署名済みUserOperationを受信・検証                   │
+│ 2. Paymaster APIを呼び出してPaymaster情報を取得        │
+│ 3. UserOperationにPaymaster情報を追加:                 │
+│    - paymaster, paymasterData,                         │
+│      paymasterVerificationGasLimit,                    │
+│      paymasterPostOpGasLimit                           │
+│ 4. Bundlerに送信してuserOpHashを取得                   │
+│ 5. userOpHashをFrontendに返却                          │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 方針の特徴
+
+#### ✅ Non-custodial（ユーザーが秘密鍵を保持）
+- Frontend側でユーザーの秘密鍵を使用して署名
+- Backend側に秘密鍵を預ける必要がない
+- セキュリティリスクが低い
+
+#### ✅ 参考実装（demo_basic_userop.ts）に近い
+- Frontend側で`SmartAccountClient`を使用してUserOperation作成
+- Backend側でPaymaster連携とBundler送信を処理
+
+#### ✅ ERC-4337の並列署名機能を活用
+- **重要**: ERC-4337では、UserOperationハッシュは`signature`と`paymasterSignature`を**除外して**計算される
+- ユーザーの署名後にPaymaster情報を追加しても、**ユーザーの署名は無効化されない**
+- ユーザーとPaymasterは独立して並列に署名可能
+
+#### ✅ Backend側で秘密情報を管理
+- PaymasterIDはBackend側の環境変数で管理
+- Frontend側に秘密情報を露出させない
+
+### Frontend実装の詳細
+
+```typescript
+// Frontend側: paymasterなしでSmartAccountClientを作成
+const smartAccountClient = createSmartAccountClient({
+  account: await toStartaleSmartAccount({
+    signer: walletClient,  // ← Frontendのウォレット
+    chain: chain,
+    transport: http(rpcUrl),  // ← 通常のRPC（Bundlerではない）
+  }),
+  client: publicClient,
+  // ⚠️ paymasterは設定しない
+});
+
+// UserOperationを準備・署名
+const userOp = await smartAccountClient.prepareUserOperation({
+  calls: [{ to, value, data }],
+});
+
+// Backend APIに送信
+const response = await fetch('/api/user-operations', {
+  method: 'POST',
+  body: JSON.stringify({ userOp, chainId }),
+});
+```
+
+### Backend実装の詳細
+
+#### paymasterService.ts
+```typescript
+export async function sponsorUserOperation(
+  userOp: UserOperation
+): Promise<UserOperation> {
+  const client = getPaymasterClient();
+  const context = getPaymasterContext();
+
+  // Paymaster APIを呼び出してPaymaster情報を取得
+  const paymasterData = await client.sponsorUserOperation({
+    userOp,
+    context,
+  });
+
+  // UserOperationにPaymaster情報を追加
+  // ⚠️ ユーザーの署名は無効化されない（ERC-4337の並列署名機能）
+  return {
+    ...userOp,
+    paymaster: paymasterData.paymaster,
+    paymasterData: paymasterData.paymasterData,
+    paymasterVerificationGasLimit: paymasterData.paymasterVerificationGasLimit,
+    paymasterPostOpGasLimit: paymasterData.paymasterPostOpGasLimit,
+  };
+}
+```
+
+#### bundlerService.ts
+```typescript
+export async function sendUserOperation(
+  userOp: UserOperation
+): Promise<string> {
+  const bundlerClient = getBundlerClient();
+  const userOpHash = await bundlerClient.sendUserOperation(userOp);
+  return userOpHash;
+}
+```
+
+#### routes/userOperation.ts
+```typescript
+router.post('/user-operations', async (req, res) => {
+  // 1. バリデーション
+  const { userOp, chainId } = validateRequest(req.body);
+
+  // 2. Paymaster情報を追加
+  const sponsoredUserOp = await sponsorUserOperation(userOp);
+
+  // 3. Bundlerに送信
+  const userOpHash = await sendUserOperation(sponsoredUserOp);
+
+  // 4. レスポンス
+  res.json({ success: true, data: { userOpHash, status: 'submitted' } });
+});
+```
+
+### 参考実装との違い
+
+| 項目 | 参考実装（demo_basic_userop.ts） | このプロジェクト |
+|------|--------------------------------|-----------------|
+| 実行環境 | Node.js CLI | Frontend (React) + Backend (Express) |
+| Signer | Node.js側で秘密鍵管理 | Frontend側でウォレット接続 |
+| SmartAccountClient | 全て1箇所で処理 | Frontend側で作成（paymasterなし） |
+| Paymaster連携 | SmartAccountClientに設定 | Backend側でAPIを呼び出し |
+| Bundler送信 | SmartAccountClient経由 | Backend側でBundler APIを呼び出し |
+| カストディアル | Yes（秘密鍵をサーバー管理） | No（ユーザーが秘密鍵を保持） |
+
+---
+
 ## 🚀 実装手順
 
 ### Phase 1: Backend 基盤実装
@@ -375,10 +522,19 @@ PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
    - エラーハンドリングミドルウェア
    - 環境変数は `process.env` から直接読み込み（dotenv不要）
 
-4. ⬜ **Paymaster Service実装** (未実装)
+4. ✅ **Paymaster Service実装** (完了: 2025-11-02)
    - `src/services/paymasterService.ts`
-   - `createSCSPaymasterClient`でクライアント作成
-   - `sponsorUserOperation`メソッド実装
+   - ✅ `createSCSPaymasterClient`でクライアント作成（シングルトンパターン）
+   - ✅ `getPaymasterClient()`関数: クライアントの取得・作成
+   - ✅ `getPaymasterContext()`関数: Paymasterコンテキストの生成
+   - ✅ `sponsorUserOperation()`メソッド実装
+     - 署名済みUserOperationを受け取る
+     - Paymaster APIを呼び出してPaymaster情報を取得
+     - UserOperationにPaymaster情報（paymaster, paymasterData, gas limits）を追加
+     - ⚠️ ERC-4337の並列署名機能により、ユーザーの署名は無効化されない
+   - ✅ 環境変数バリデーション: `validateConfig()`
+   - ✅ 設定確認関数: `isPaymasterConfigured()`
+   - ✅ 詳細なログ出力（ガス見積もり、コスト計算含む）
 
 5. ⬜ **Bundler Service実装** (未実装)
    - `src/services/bundlerService.ts`
@@ -445,12 +601,17 @@ PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
 
 4. ⬜ **SmartAccount Hook実装** (未実装)
    - `src/hooks/useSmartAccount.ts`
-   - `toStartaleSmartAccount`でアカウント作成
-   - `sendUserOperation`関数実装
+   - `createSmartAccountClient`でクライアント作成
+     - `toStartaleSmartAccount`でアカウント作成
+     - ⚠️ **paymasterは設定しない**（通常のRPC使用）
+   - `prepareUserOperation`でUserOperationを作成・署名
+   - 署名済みUserOperationをBackend APIに送信
 
-5. **API Client実装**
+5. ⬜ **API Client実装** (未実装)
    - `src/lib/api.ts`
    - Backend APIとの通信ロジック
+   - `POST /api/user-operations`: 署名済みUserOpを送信
+   - `GET /api/user-operations/:hash`: ステータス確認
 
 6. **UI実装**
    - `src/components/SendTransaction.tsx`
