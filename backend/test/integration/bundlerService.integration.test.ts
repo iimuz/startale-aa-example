@@ -26,7 +26,7 @@ import {
 } from '../../src/services/bundlerService';
 import { sponsorUserOperation } from '../../src/services/paymasterService';
 import type { UserOperation } from '../../src/types/userOperation';
-import { http } from 'viem';
+import { http, parseEther } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { soneiumMinato } from 'viem/chains';
 import { toStartaleSmartAccount } from '@startale-scs/aa-sdk';
@@ -39,6 +39,11 @@ const TEST_PRIVATE_KEY =
   process.env.TEST_PRIVATE_KEY ||
   '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
 const RPC_URL = process.env.MINATO_RPC || 'https://rpc.minato.soneium.org/';
+
+// ETH transfer test configuration
+const TEST_SMART_ACCOUNT_PRIVATE_KEY = process.env.TEST_SMART_ACCOUNT_PRIVATE_KEY;
+const TEST_RECIPIENT_ADDRESS = process.env.TEST_RECIPIENT_ADDRESS;
+const TEST_TRANSFER_AMOUNT = process.env.TEST_TRANSFER_AMOUNT || '0.001'; // 0.001 ETH by default
 
 describe('BundlerService Integration Tests', () => {
   beforeAll(() => {
@@ -90,7 +95,7 @@ describe('BundlerService Integration Tests', () => {
       console.log('💾 Cache saved to:', CACHE_FILE);
     });
 
-    it.only('E2E: Create, sponsor, and send UserOperation', async () => {
+    it('E2E: Create, sponsor, and send UserOperation', async () => {
       // Skip if already completed
       if (cache.receipt) {
         console.log('⏭️  Test already completed');
@@ -212,6 +217,135 @@ describe('BundlerService Integration Tests', () => {
       } else {
         console.log('⚠️  Receipt not available yet (may need more time to confirm)');
         throw new Error('UserOperation receipt not found after polling');
+      }
+    });
+
+    it.only('E2E: Transfer ETH using smart account', async () => {
+      // Verify required environment variables for this test
+      if (!TEST_SMART_ACCOUNT_PRIVATE_KEY) {
+        console.log('⏭️  Skipping ETH transfer test: TEST_SMART_ACCOUNT_PRIVATE_KEY not set');
+        return;
+      }
+      if (!TEST_RECIPIENT_ADDRESS) {
+        console.log('⏭️  Skipping ETH transfer test: TEST_RECIPIENT_ADDRESS not set');
+        return;
+      }
+
+      console.log('🚀 Starting ETH Transfer E2E flow...');
+      console.log(`   Transfer Amount: ${TEST_TRANSFER_AMOUNT} ETH`);
+      console.log(`   Recipient: ${TEST_RECIPIENT_ADDRESS}`);
+
+      // ===== Step 1: Create smart account and prepare ETH transfer =====
+      console.log('\n📝 Step 1: Creating smart account and preparing ETH transfer...');
+
+      // Create signer from private key
+      const signer = privateKeyToAccount(TEST_SMART_ACCOUNT_PRIVATE_KEY as `0x${string}`);
+
+      // Create SmartAccount using SDK
+      const smartAccount = await toStartaleSmartAccount({
+        signer,
+        chain: soneiumMinato,
+        transport: http(RPC_URL),
+        index: BigInt(999),
+      });
+
+      // Get factory and factoryData for undeployed account
+      const { factory, factoryData } = await smartAccount.getFactoryArgs();
+      const accountAddress = await smartAccount.getAddress();
+      const nonce = await smartAccount.getNonce();
+
+      console.log(`   Account: ${accountAddress}`);
+      console.log(`   Nonce: 0x${nonce.toString(16)}`);
+
+      // Generate callData for ETH transfer
+      const transferAmount = parseEther(TEST_TRANSFER_AMOUNT);
+      const callData = await smartAccount.encodeExecute({
+        to: TEST_RECIPIENT_ADDRESS as `0x${string}`,
+        value: transferAmount,
+        data: '0x',
+      });
+
+      console.log(`   Transferring ${TEST_TRANSFER_AMOUNT} ETH to ${TEST_RECIPIENT_ADDRESS}`);
+
+      // Build UserOperation
+      const userOp = {
+        sender: accountAddress,
+        nonce: `0x${nonce.toString(16)}`,
+        factory: factory!,
+        factoryData: factoryData!,
+        callData,
+        callGasLimit: '0x50000', // 327,680
+        verificationGasLimit: '0x100000', // 1,048,576
+        preVerificationGas: '0x20000', // 131,072
+        maxFeePerGas: '0x3b9aca00',
+        maxPriorityFeePerGas: '0x3b9aca00',
+        signature: '0x', // Placeholder
+      };
+
+      // Get Paymaster sponsorship (with signature: '0x')
+      const sponsoredForSigning = await sponsorUserOperation(userOp, undefined, true);
+
+      // Sign the UserOperation
+      const signature = await smartAccount.signUserOperation(sponsoredForSigning);
+
+      const sponsored: UserOperation = {
+        ...sponsoredForSigning,
+        signature,
+      };
+
+      console.log('✅ Step 1 completed:');
+      console.log(`   Paymaster: ${sponsored.paymaster}`);
+      console.log(`   Signature: ${signature.substring(0, 20)}...`);
+
+      expect(sponsored.paymaster).toBeDefined();
+      expect(sponsored.paymasterData).toBeDefined();
+      expect(sponsored.signature).toBeDefined();
+
+      // ===== Step 2: Send UserOperation to Bundler =====
+      console.log('\n📤 Step 2: Sending ETH transfer UserOperation to Bundler...');
+
+      const userOpHash = await sendUserOperation(sponsored);
+
+      console.log('✅ Step 2 completed:');
+      console.log(`   UserOp Hash: ${userOpHash}`);
+
+      expect(userOpHash).toBeDefined();
+      expect(typeof userOpHash).toBe('string');
+      expect(userOpHash).toMatch(/^0x[a-fA-F0-9]{64}$/);
+
+      // ===== Step 3: Get UserOperation receipt =====
+      console.log('\n⏳ Step 3: Waiting for ETH transfer confirmation...');
+
+      // Poll for receipt
+      let receipt = null;
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      while (!receipt && attempts < maxAttempts) {
+        if (attempts > 0) {
+          console.log(`   Polling attempt ${attempts}/${maxAttempts}...`);
+          await new Promise((resolve) => setTimeout(resolve, 3000)); // Wait 3 seconds
+        }
+
+        receipt = await getUserOperationReceipt(userOpHash);
+        attempts++;
+      }
+
+      if (receipt) {
+        console.log('✅ Step 3 completed - ETH transfer successful:');
+        console.log(`   Transaction Hash: ${receipt.transactionHash}`);
+        console.log(`   Block Number: ${receipt.blockNumber}`);
+        console.log(`   Success: ${receipt.success}`);
+        console.log(`   Actual Gas Used: ${receipt.actualGasUsed}`);
+        console.log(`   Amount Transferred: ${TEST_TRANSFER_AMOUNT} ETH`);
+
+        expect(receipt.userOpHash).toBe(userOpHash);
+        expect(receipt.transactionHash).toBeDefined();
+        expect(receipt.blockNumber).toBeDefined();
+        expect(receipt.success).toBe(true);
+      } else {
+        console.log('⚠️  Receipt not available yet (may need more time to confirm)');
+        throw new Error('ETH transfer UserOperation receipt not found after polling');
       }
     });
 
