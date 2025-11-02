@@ -536,11 +536,22 @@ router.post('/user-operations', async (req, res) => {
    - ✅ 設定確認関数: `isPaymasterConfigured()`
    - ✅ 詳細なログ出力（ガス見積もり、コスト計算含む）
 
-5. ⬜ **Bundler Service実装** (未実装)
+5. ✅ **Bundler Service実装** (完了: 2025-11-02)
    - `src/services/bundlerService.ts`
-   - `createBundlerClient`でクライアント作成
-   - `sendUserOperation`メソッド実装
-   - `getUserOperationReceipt`メソッド実装
+   - ✅ `createPublicClient`でクライアント作成（シングルトンパターン）
+   - ✅ `getBundlerClient()`関数: クライアントの取得・作成
+   - ✅ `sendUserOperation()`メソッド実装
+     - UserOperationをBundlerに送信
+     - `eth_sendUserOperation` RPC メソッドを呼び出し
+     - `userOpHash`を取得して返却
+   - ✅ `getUserOperationReceipt()`メソッド実装
+     - `eth_getUserOperationReceipt` RPC メソッドを呼び出し
+     - トランザクションハッシュ、ブロック番号、ガス使用量などを取得
+     - まだ確認されていない場合は`null`を返す
+   - ✅ 環境変数バリデーション: `validateConfig()`
+   - ✅ 設定確認関数: `isBundlerConfigured()`
+   - ✅ API キー対応（`BUNDLER_API_KEY`）
+   - ✅ 詳細なログ出力
 
 6. ⬜ **UserOperation Route実装** (未実装)
    - `src/routes/userOperation.ts`
