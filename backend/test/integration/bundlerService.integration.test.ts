@@ -44,6 +44,7 @@ const RPC_URL = process.env.MINATO_RPC || 'https://rpc.minato.soneium.org/';
 const TEST_SMART_ACCOUNT_PRIVATE_KEY = process.env.TEST_SMART_ACCOUNT_PRIVATE_KEY;
 const TEST_RECIPIENT_ADDRESS = process.env.TEST_RECIPIENT_ADDRESS;
 const TEST_TRANSFER_AMOUNT = process.env.TEST_TRANSFER_AMOUNT || '0.001'; // 0.001 ETH by default
+const TEST_SMART_ACCOUNT_ADDRESS = process.env.TEST_SMART_ACCOUNT_ADDRESS;
 
 describe('BundlerService Integration Tests', () => {
   beforeAll(() => {
@@ -246,7 +247,8 @@ describe('BundlerService Integration Tests', () => {
         signer,
         chain: soneiumMinato,
         transport: http(RPC_URL),
-        index: BigInt(999),
+        // index: BigInt(999),
+        accountAddress: TEST_SMART_ACCOUNT_ADDRESS,
       });
 
       // Get factory and factoryData for undeployed account
