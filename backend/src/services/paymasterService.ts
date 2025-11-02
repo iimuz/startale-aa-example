@@ -161,6 +161,11 @@ export async function sponsorUserOperation(
     // Note: User's signature remains valid (ERC-4337 parallel signing feature)
     const sponsoredUserOp: UserOperation = {
       ...userOp,
+      // Update gas limits if Paymaster API calculated new values
+      ...(paymasterData.callGasLimit && { callGasLimit: paymasterData.callGasLimit }),
+      ...(paymasterData.verificationGasLimit && { verificationGasLimit: paymasterData.verificationGasLimit }),
+      ...(paymasterData.preVerificationGas && { preVerificationGas: paymasterData.preVerificationGas }),
+      // Add paymaster fields
       paymaster: paymasterData.paymaster,
       paymasterData: paymasterData.paymasterData,
       ...(paymasterData.paymasterVerificationGasLimit && {
