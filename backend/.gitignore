@@ -7,3 +7,6 @@ dev.sh
 .env.local
 *.log
 .DS_Store
+
+# Test cache files
+.test-cache.json
