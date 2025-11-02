@@ -26,10 +26,16 @@ import {
 } from '../../src/services/bundlerService';
 import { sponsorUserOperation } from '../../src/services/paymasterService';
 import type { UserOperation } from '../../src/types/userOperation';
-import { http, parseEther } from 'viem';
+import { createPublicClient, http, parseEther, zeroAddress } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
+import { toAccount } from 'viem/accounts';
 import { soneiumMinato } from 'viem/chains';
-import { toStartaleSmartAccount } from '@startale-scs/aa-sdk';
+import {
+  toStartaleSmartAccount,
+  getStartaleAccountAddress,
+  getInitData,
+  toInitData,
+} from '@startale-scs/aa-sdk';
 import fs from 'fs';
 import path from 'path';
 
@@ -221,7 +227,7 @@ describe('BundlerService Integration Tests', () => {
       }
     });
 
-    it.only('E2E: Transfer ETH using smart account', async () => {
+    it('E2E: Transfer ETH using smart account', async () => {
       // Verify required environment variables for this test
       if (!TEST_SMART_ACCOUNT_PRIVATE_KEY) {
         console.log('⏭️  Skipping ETH transfer test: TEST_SMART_ACCOUNT_PRIVATE_KEY not set');
@@ -351,5 +357,69 @@ describe('BundlerService Integration Tests', () => {
       }
     });
 
+  });
+
+  describe('Smart Account Address Determination without Private Key', () => {
+    it('should calculate smart account address using mock signer (no signing capability)', async () => {
+      console.log('🔍 Test 2: Calculate address using mock signer with no signing capability');
+
+      const index = BigInt(999);
+
+      // Step 1: Create reference account with real private key
+      console.log('\n📝 Step 1: Creating reference account with real private key...');
+      const realSigner = privateKeyToAccount(TEST_PRIVATE_KEY as `0x${string}`);
+      const eoaAddress = realSigner.address;
+      console.log(`   EOA Address: ${eoaAddress}`);
+
+      const referenceAccount = await toStartaleSmartAccount({
+        signer: realSigner,
+        chain: soneiumMinato,
+        transport: http(RPC_URL),
+        index,
+      });
+
+      const referenceAddress = await referenceAccount.getAddress();
+      console.log(`   Reference Smart Account Address: ${referenceAddress}`);
+
+      // Step 2: Create mock signer with only address (no signing capability)
+      console.log('\n📝 Step 2: Creating mock signer with only EOA address (no private key)...');
+      const mockSigner = toAccount({
+        address: eoaAddress,
+        async signMessage() {
+          throw new Error('Mock signer cannot sign messages - no private key!');
+        },
+        async signTypedData() {
+          throw new Error('Mock signer cannot sign typed data - no private key!');
+        },
+        async signTransaction() {
+          throw new Error('Mock signer cannot sign transactions - no private key!');
+        },
+      });
+
+      console.log(`   Mock Signer Address: ${mockSigner.address}`);
+
+      // Step 3: Create smart account with mock signer
+      console.log('\n📝 Step 3: Creating smart account with mock signer...');
+      const mockAccount = await toStartaleSmartAccount({
+        signer: mockSigner,
+        chain: soneiumMinato,
+        transport: http(RPC_URL),
+        index,
+      });
+
+      // getAddress() should work without needing to sign anything
+      const mockAddress = await mockAccount.getAddress();
+      console.log(`   Smart Account Address (from mock): ${mockAddress}`);
+
+      // Step 4: Verify addresses match
+      console.log('\n✅ Step 4: Verifying addresses match...');
+      expect(mockAddress).toBe(referenceAddress);
+      console.log(`   ✓ Addresses match: ${mockAddress === referenceAddress}`);
+
+      console.log('\n🎉 Conclusion:');
+      console.log('   ✓ Smart account address can be calculated with mock signer!');
+      console.log('   ✓ No signing capability needed for address calculation.');
+      console.log('   ✓ Only the EOA address property is required.');
+    });
   });
 });
