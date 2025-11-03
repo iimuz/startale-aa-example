@@ -169,10 +169,10 @@ export async function sponsorUserOperation(
       paymaster: paymasterData.paymaster,
       paymasterData: paymasterData.paymasterData,
       ...(paymasterData.paymasterVerificationGasLimit && {
-        paymasterVerificationGasLimit: paymasterData.paymasterVerificationGasLimit.toString(),
+        paymasterVerificationGasLimit: `0x${BigInt(paymasterData.paymasterVerificationGasLimit).toString(16)}`,
       }),
       ...(paymasterData.paymasterPostOpGasLimit && {
-        paymasterPostOpGasLimit: paymasterData.paymasterPostOpGasLimit.toString(),
+        paymasterPostOpGasLimit: `0x${BigInt(paymasterData.paymasterPostOpGasLimit).toString(16)}`,
       }),
     };
 

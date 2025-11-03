@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { errorHandler } from './middleware/errorHandler';
+import userOperationRoutes from './routes/userOperation';
 
 const app = express();
 
@@ -41,15 +42,19 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// TODO: Add UserOperation routes
-// app.use('/api', userOperationRoutes);
+// UserOperation routes
+app.use('/api', userOperationRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`
+// Export app for testing
+export { app };
+
+// Start server (only if not in test mode)
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`
 🚀 Account Abstraction Backend Server Started
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Environment: ${NODE_ENV}
@@ -59,4 +64,5 @@ app.listen(PORT, () => {
   Health Check: http://localhost:${PORT}/health
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   `);
-});
+  });
+}

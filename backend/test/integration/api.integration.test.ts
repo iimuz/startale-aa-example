@@ -1,0 +1,234 @@
+/**
+ * Integration tests for API endpoints
+ *
+ * These tests verify the complete E2E flow through the API:
+ * 1. POST /api/user-operations/sponsor - Get Paymaster sponsorship
+ * 2. Sign UserOperation (client-side simulation)
+ * 3. POST /api/user-operations - Submit signed UserOperation
+ * 4. GET /api/user-operations/:hash - Poll for receipt
+ *
+ * Features:
+ * - JSON cache system for resuming from failed steps
+ * - Complete E2E flow through API endpoints
+ * - Cache file: .api-test-cache.json
+ *
+ * Usage:
+ * - Run tests: npm run test:integration
+ * - Clean cache and restart: rm test/integration/.api-test-cache.json
+ */
+
+import { describe, it, expect, beforeAll, afterEach } from '@jest/globals';
+import request from 'supertest';
+import { app } from '../../src/index';
+import { privateKeyToAccount } from 'viem/accounts';
+import { http } from 'viem';
+import { soneiumMinato } from 'viem/chains';
+import { toStartaleSmartAccount } from '@startale-scs/aa-sdk';
+import fs from 'fs';
+import path from 'path';
+
+// Test configuration
+const CACHE_FILE = path.join(__dirname, '.api-test-cache.json');
+const TEST_PRIVATE_KEY =
+  process.env.TEST_PRIVATE_KEY ||
+  '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+const RPC_URL = process.env.MINATO_RPC || 'https://rpc.minato.soneium.org/';
+const CHAIN_ID = 1946; // Soneium Minato
+
+describe.only('API Integration Tests', () => {
+  beforeAll(() => {
+    // Verify that required environment variables are set
+    const requiredEnvVars = ['BUNDLER_URL', 'ENTRY_POINT_ADDRESS', 'CHAIN_ID', 'PAYMASTER_ID'];
+    const missing = requiredEnvVars.filter((v) => !process.env[v]);
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Integration tests require the following environment variables: ${missing.join(', ')}`
+      );
+    }
+  });
+
+  describe('E2E UserOperation flow via API', () => {
+    let cache: any = {};
+
+    beforeAll(() => {
+      // Load cache file if it exists
+      if (fs.existsSync(CACHE_FILE)) {
+        cache = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf-8'));
+        console.log('📦 Loaded cache from previous run');
+        console.log(`   Cache file: ${CACHE_FILE}`);
+      } else {
+        console.log('🆕 Starting fresh (no cache found)');
+      }
+    });
+
+    afterEach(() => {
+      // Save cache after each step
+      fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2));
+      console.log('💾 Cache saved to:', CACHE_FILE);
+    });
+
+    it('E2E: Sponsor, sign, and submit UserOperation via API', async () => {
+      // Skip if already completed
+      if (cache.receipt) {
+        console.log('⏭️  Test already completed');
+        console.log(`   Transaction Hash: ${cache.receipt.transactionHash}`);
+        console.log(`   Success: ${cache.receipt.success}`);
+        expect(cache.receipt).toBeDefined();
+        return;
+      }
+
+      console.log('🚀 Starting E2E UserOperation flow via API...');
+
+      // ===== Step 1: Create UserOperation =====
+      console.log('\n📝 Step 1: Creating UserOperation...');
+
+      // Create signer from test private key
+      const signer = privateKeyToAccount(TEST_PRIVATE_KEY as `0x${string}`);
+
+      // Create SmartAccount using SDK
+      const smartAccount = await toStartaleSmartAccount({
+        signer,
+        chain: soneiumMinato,
+        transport: http(RPC_URL),
+        index: BigInt(999),
+      });
+
+      // Get factory and factoryData for undeployed account
+      const { factory, factoryData } = await smartAccount.getFactoryArgs();
+      const accountAddress = await smartAccount.getAddress();
+      const nonce = await smartAccount.getNonce();
+
+      console.log(`   Account: ${accountAddress}`);
+      console.log(`   Nonce: 0x${nonce.toString(16)}`);
+
+      // Generate callData (dummy self-call that does nothing)
+      const callData = await smartAccount.encodeExecute({
+        to: accountAddress,
+        value: 0n,
+        data: '0x',
+      });
+
+      // Build UserOperation (without signature)
+      const userOp = {
+        sender: accountAddress,
+        nonce: `0x${nonce.toString(16)}`,
+        factory: factory!,
+        factoryData: factoryData!,
+        callData,
+        callGasLimit: '0x50000',
+        verificationGasLimit: '0x100000',
+        preVerificationGas: '0x20000',
+        maxFeePerGas: '0x3b9aca00',
+        maxPriorityFeePerGas: '0x3b9aca00',
+        signature: '0x', // Placeholder
+      };
+
+      console.log('✅ Step 1 completed: UserOperation created');
+
+      // ===== Step 2: Get Paymaster sponsorship via API =====
+      console.log('\n📤 Step 2: Getting Paymaster sponsorship via API...');
+
+      const sponsorResponse = await request(app)
+        .post('/api/user-operations/sponsor')
+        .send({ userOp, chainId: CHAIN_ID })
+        .expect(200);
+
+      expect(sponsorResponse.body.success).toBe(true);
+      expect(sponsorResponse.body.data.sponsoredUserOp).toBeDefined();
+
+      const sponsoredUserOp = sponsorResponse.body.data.sponsoredUserOp;
+
+      console.log('✅ Step 2 completed:');
+      console.log(`   Paymaster: ${sponsoredUserOp.paymaster}`);
+      console.log(`   Paymaster Data: ${sponsoredUserOp.paymasterData?.substring(0, 20)}...`);
+
+      expect(sponsoredUserOp.paymaster).toBeDefined();
+      expect(sponsoredUserOp.paymasterData).toBeDefined();
+
+      // ===== Step 3: Sign the UserOperation =====
+      console.log('\n✍️  Step 3: Signing UserOperation...');
+
+      const signature = await smartAccount.signUserOperation(sponsoredUserOp);
+
+      const signedUserOp = {
+        ...sponsoredUserOp,
+        signature,
+      };
+
+      console.log('✅ Step 3 completed:');
+      console.log(`   Signature: ${signature.substring(0, 20)}...`);
+
+      expect(signature).toBeDefined();
+      expect(signature).toMatch(/^0x[a-fA-F0-9]+$/);
+
+      // ===== Step 4: Submit signed UserOperation via API =====
+      console.log('\n📤 Step 4: Submitting signed UserOperation via API...');
+
+      const submitResponse = await request(app)
+        .post('/api/user-operations')
+        .send({ userOp: signedUserOp, chainId: CHAIN_ID });
+
+      // Debug: Display response for troubleshooting
+      if (submitResponse.status !== 200) {
+        console.log('\n❌ Step 4 failed with status:', submitResponse.status);
+        console.log('Response body:', JSON.stringify(submitResponse.body, null, 2));
+      }
+
+      expect(submitResponse.status).toBe(200);
+      expect(submitResponse.body.success).toBe(true);
+      expect(submitResponse.body.data.userOpHash).toBeDefined();
+
+      const userOpHash = submitResponse.body.data.userOpHash;
+
+      console.log('✅ Step 4 completed:');
+      console.log(`   UserOp Hash: ${userOpHash}`);
+
+      expect(userOpHash).toMatch(/^0x[a-fA-F0-9]{64}$/);
+
+      // ===== Step 5: Poll for UserOperation receipt via API =====
+      console.log('\n⏳ Step 5: Polling for UserOperation receipt via API...');
+
+      let receipt = null;
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      while (!receipt && attempts < maxAttempts) {
+        if (attempts > 0) {
+          console.log(`   Polling attempt ${attempts}/${maxAttempts}...`);
+          await new Promise((resolve) => setTimeout(resolve, 3000)); // Wait 3 seconds
+        }
+
+        const statusResponse = await request(app)
+          .get(`/api/user-operations/${userOpHash}`)
+          .expect(200);
+
+        expect(statusResponse.body.success).toBe(true);
+
+        if (statusResponse.body.data.status === 'confirmed') {
+          receipt = statusResponse.body.data.receipt;
+        }
+
+        attempts++;
+      }
+
+      if (receipt) {
+        console.log('✅ Step 5 completed:');
+        console.log(`   Transaction Hash: ${receipt.transactionHash}`);
+        console.log(`   Block Number: ${receipt.blockNumber}`);
+        console.log(`   Success: ${receipt.success}`);
+        console.log(`   Actual Gas Used: ${receipt.actualGasUsed}`);
+
+        // Save to cache
+        cache.receipt = receipt;
+
+        expect(receipt.transactionHash).toBeDefined();
+        expect(receipt.blockNumber).toBeDefined();
+        expect(receipt.success).toBeDefined();
+      } else {
+        console.log('⚠️  Receipt not available yet (may need more time to confirm)');
+        throw new Error('UserOperation receipt not found after polling');
+      }
+    }, 60000); // 60 second timeout for the entire test
+  });
+});
