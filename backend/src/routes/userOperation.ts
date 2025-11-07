@@ -15,7 +15,7 @@ const router = Router();
 
 /**
  * POST /user-operations/sponsor
- * Get Paymaster sponsorship for a UserOperation (before signing)
+ * Get Paymaster sponsorship for a UserOperation
  */
 router.post(
   '/user-operations/sponsor',
@@ -23,36 +23,22 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { userOp, chainId } = req.body as UserOperationRequest;
+      console.log(`Received sponsor request. Sender: ${userOp.sender}, Chain ID: ${chainId}`);
 
-      console.log('\n📝 Received sponsor request');
-      console.log(`   Sender: ${userOp.sender}`);
-      console.log(`   Chain ID: ${chainId}`);
-
-      // Get Paymaster sponsorship (add Paymaster fields)
-      console.log('\n🔄 Getting Paymaster sponsorship...');
       const sponsoredUserOp = await sponsorUserOperation(userOp, chainId);
-
-      // Return sponsored UserOperation (ready for signing)
       const response = {
         success: true,
         data: {
           sponsoredUserOp,
         },
       };
-
-      console.log('\n✅ Paymaster sponsorship obtained');
-      console.log(`   Paymaster: ${sponsoredUserOp.paymaster}`);
-      console.log(`   Ready for signing\n`);
-
       res.status(200).json(response);
     } catch (error) {
-      console.error('\n❌ Error getting Paymaster sponsorship:', error);
+      console.error('Error getting Paymaster sponsorship:', error);
 
-      // Create error object with statusCode for errorHandler
       const err = error as Error & { statusCode?: number; code?: string };
       err.statusCode = 400;
       err.code = 'SPONSOR_FAILED';
-
       next(err);
     }
   }
@@ -68,17 +54,11 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { userOp, chainId } = req.body as UserOperationRequest;
+      console.log(`Sending UserOperation to Bundler. , Chain ID: ${chainId}, Sender: ${userOp.sender}, Nonce: ${userOp.nonce}, Call Data: ${userOp.callData.substring(0, 20)}...`);
 
-      console.log('\n📥 Received UserOperation submission request');
-      console.log(`   Sender: ${userOp.sender}`);
-      console.log(`   Chain ID: ${chainId}`);
-      console.log(`   Has Paymaster: ${!!userOp.paymaster}`);
-
-      // Send UserOperation to Bundler
-      console.log('\n🔄 Sending UserOperation to Bundler...');
       const userOpHash = await sendUserOperation(userOp);
+      console.log(`UserOperation submitted successfully. UserOp Hash: ${userOpHash}`);
 
-      // Return response
       const response: UserOperationResponse = {
         success: true,
         data: {
@@ -86,20 +66,13 @@ router.post(
           status: 'submitted',
         },
       };
-
-      console.log('\n✅ UserOperation submitted successfully');
-      console.log(`   UserOp Hash: ${userOpHash}`);
-      console.log(`   Status: submitted\n`);
-
       res.status(200).json(response);
     } catch (error) {
-      console.error('\n❌ Error processing UserOperation:', error);
+      console.error('Error processing UserOperation:', error);
 
-      // Create error object with statusCode for errorHandler
       const err = error as Error & { statusCode?: number; code?: string };
       err.statusCode = 400;
       err.code = 'USEROP_SUBMISSION_FAILED';
-
       next(err);
     }
   }
@@ -115,14 +88,11 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { hash } = req.params;
+      console.log(`Checking UserOperation status for hash: ${hash}`);
 
-      console.log(`\n🔍 Checking UserOperation status for hash: ${hash}`);
-
-      // Get UserOperation receipt from Bundler
       const receipt = await getUserOperationReceipt(hash);
-
       if (!receipt) {
-        // UserOperation is still pending
+        console.log(`Status: Pending (not yet included in a block)`);
         const response: UserOperationResponse = {
           success: true,
           data: {
@@ -130,11 +100,11 @@ router.get(
             status: 'pending',
           },
         };
-
-        console.log(`   Status: pending (not yet included in a block)\n`);
         res.status(200).json(response);
         return;
       }
+      const status = receipt.success ? 'confirmed' : 'failed';
+      console.log(`UserOperation status retrieved. Status: ${status}, Transaction Hash: ${receipt.transactionHash}, Block Number: ${receipt.blockNumber}, Actual Gas Used: ${receipt.actualGasUsed}`);
 
       // UserOperation is confirmed
       const response: UserOperationResponse = {
@@ -151,20 +121,13 @@ router.get(
           },
         },
       };
-
-      console.log(`   Status: ${receipt.success ? 'confirmed' : 'failed'}`);
-      console.log(`   Transaction Hash: ${receipt.transactionHash}`);
-      console.log(`   Block Number: ${receipt.blockNumber}\n`);
-
       res.status(200).json(response);
     } catch (error) {
-      console.error('\n❌ Error getting UserOperation status:', error);
+      console.error('Error getting UserOperation status:', error);
 
-      // Create error object with statusCode for errorHandler
       const err = error as Error & { statusCode?: number; code?: string };
       err.statusCode = 400;
       err.code = 'USEROP_STATUS_CHECK_FAILED';
-
       next(err);
     }
   }

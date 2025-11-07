@@ -11,7 +11,6 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ) => {
-  // Log error for debugging
   console.error('[Error]', {
     message: err.message,
     code: err.code,
@@ -20,11 +19,9 @@ export const errorHandler = (
     method: req.method,
   });
 
-  // Determine status code
   const statusCode = err.statusCode || 500;
   const errorCode = err.code || 'INTERNAL_SERVER_ERROR';
 
-  // Send error response
   res.status(statusCode).json({
     success: false,
     error: {

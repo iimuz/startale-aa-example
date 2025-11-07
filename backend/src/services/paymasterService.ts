@@ -44,7 +44,7 @@ export function getPaymasterClient() {
       transport: http(PAYMASTER_SERVICE_URL!),
     });
 
-    console.log(`✅ Paymaster client initialized: ${PAYMASTER_SERVICE_URL}`);
+    console.log(`Paymaster client initialized: ${PAYMASTER_SERVICE_URL}`);
   }
 
   return paymasterClient;
@@ -91,11 +91,6 @@ export async function sponsorUserOperation(
       : parseInt(CHAIN_ID!, 10);
     const effectiveChainId = chainId ?? parsedChainId;
 
-    console.log(`📝 Sponsoring UserOperation for sender: ${userOp.sender}`);
-    console.log(`   Chain ID: ${effectiveChainId}`);
-    console.log(`   Paymaster ID: ${PAYMASTER_ID}`);
-
-    // Call Paymaster API to get paymaster-related fields
     const paymasterData = await client.getPaymasterData({
       // UserOperation fields
       sender: userOp.sender,
@@ -116,21 +111,16 @@ export async function sponsorUserOperation(
       // Paymaster context
       context,
     });
-
-    console.log(`✅ Paymaster data retrieved successfully`);
-    console.log(`   Paymaster address: ${paymasterData.paymaster}`);
-
-    // Display estimated gas limits when calculateGasLimits is true
     if (calculateGasLimits) {
-      console.log(`📊 Estimated Gas Limits:`);
-      console.log(`   Call Gas Limit: ${paymasterData.callGasLimit || userOp.callGasLimit}`);
-      console.log(`   Verification Gas Limit: ${paymasterData.verificationGasLimit || userOp.verificationGasLimit}`);
-      console.log(`   Pre-verification Gas: ${paymasterData.preVerificationGas || userOp.preVerificationGas}`);
+      console.log(`Estimated Gas Limits:`);
+      console.log(`Call Gas Limit: ${paymasterData.callGasLimit || userOp.callGasLimit}`);
+      console.log(`Verification Gas Limit: ${paymasterData.verificationGasLimit || userOp.verificationGasLimit}`);
+      console.log(`Pre-verification Gas: ${paymasterData.preVerificationGas || userOp.preVerificationGas}`);
       if (paymasterData.paymasterVerificationGasLimit) {
-        console.log(`   Paymaster Verification Gas Limit: ${paymasterData.paymasterVerificationGasLimit}`);
+        console.log(`Paymaster Verification Gas Limit: ${paymasterData.paymasterVerificationGasLimit}`);
       }
       if (paymasterData.paymasterPostOpGasLimit) {
-        console.log(`   Paymaster Post-Op Gas Limit: ${paymasterData.paymasterPostOpGasLimit}`);
+        console.log(`Paymaster Post-Op Gas Limit: ${paymasterData.paymasterPostOpGasLimit}`);
       }
 
       // Calculate and display total estimated gas
@@ -140,16 +130,14 @@ export async function sponsorUserOperation(
         BigInt(paymasterData.preVerificationGas || userOp.preVerificationGas) +
         BigInt(paymasterData.paymasterVerificationGasLimit || 0) +
         BigInt(paymasterData.paymasterPostOpGasLimit || 0);
-
-      console.log(`   Total Estimated Gas: ${totalGas}`);
+      console.log(`Total Estimated Gas: ${totalGas}`);
 
       // Calculate and display estimated cost in ETH
       const maxFeePerGas = BigInt(userOp.maxFeePerGas);
       const estimatedCostWei = totalGas * maxFeePerGas;
       const estimatedCostEth = Number(estimatedCostWei) / 1e18;
-
-      console.log(`   Max Fee Per Gas: ${maxFeePerGas} wei (${Number(maxFeePerGas) / 1e9} Gwei)`);
-      console.log(`   Estimated Cost (at max fee): ${estimatedCostEth.toFixed(10)} ETH`);
+      console.log(`Max Fee Per Gas: ${maxFeePerGas} wei (${Number(maxFeePerGas) / 1e9} Gwei)`);
+      console.log(`Estimated Cost (at max fee): ${estimatedCostEth.toFixed(10)} ETH`);
     }
 
     // Merge paymaster fields into UserOperation
@@ -173,7 +161,7 @@ export async function sponsorUserOperation(
 
     return sponsoredUserOp;
   } catch (error) {
-    console.error('❌ Error sponsoring UserOperation:', error);
+    console.error('Error sponsoring UserOperation:', error);
     throw new Error(
       `Failed to sponsor UserOperation: ${(error as Error).message}`
     );

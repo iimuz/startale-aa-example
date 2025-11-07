@@ -9,7 +9,6 @@ import { createPublicClient, http, type Address, type Hash } from 'viem';
 import { ENTRY_POINT_ADDRESS } from '@startale-scs/aa-sdk';
 import type { UserOperation, UserOperationReceipt } from '../types/userOperation';
 
-// Environment variables
 const BUNDLER_URL = process.env.BUNDLER_URL;
 const BUNDLER_API_KEY = process.env.BUNDLER_API_KEY;
 const CHAIN_ID = process.env.CHAIN_ID;
@@ -41,22 +40,16 @@ export function getBundlerClient() {
     // Create transport with optional API key
     const transport = BUNDLER_API_KEY
       ? http(BUNDLER_URL!, {
-          fetchOptions: {
-            headers: {
-              'x-api-key': BUNDLER_API_KEY,
-            },
+        fetchOptions: {
+          headers: {
+            'x-api-key': BUNDLER_API_KEY,
           },
-        })
+        },
+      })
       : http(BUNDLER_URL!);
-
     bundlerClient = createPublicClient({
       transport,
     });
-
-    console.log(`✅ Bundler client initialized: ${BUNDLER_URL}`);
-    if (BUNDLER_API_KEY) {
-      console.log(`   API Key: ${BUNDLER_API_KEY.substring(0, 8)}...`);
-    }
   }
 
   return bundlerClient;
@@ -74,12 +67,6 @@ export function getBundlerClient() {
 export async function sendUserOperation(userOp: UserOperation): Promise<string> {
   try {
     validateConfig();
-    const client = getBundlerClient();
-
-    console.log(`📤 Sending UserOperation to Bundler...`);
-    console.log(`   Sender: ${userOp.sender}`);
-    console.log(`   Nonce: ${userOp.nonce}`);
-    console.log(`   Call Data: ${userOp.callData.substring(0, 20)}...`);
 
     // Prepare UserOperation for Bundler
     // Convert all fields to hex string format
@@ -104,19 +91,15 @@ export async function sendUserOperation(userOp: UserOperation): Promise<string> 
         paymasterPostOpGasLimit: userOp.paymasterPostOpGasLimit,
       }),
     };
-
-    // Call Bundler RPC method: eth_sendUserOperation
+    const client = getBundlerClient();
     const userOpHash = await client.request({
       method: 'eth_sendUserOperation' as any,
       params: [userOpForBundler, ENTRY_POINT_ADDRESS! as Address],
     });
 
-    console.log(`✅ UserOperation sent successfully`);
-    console.log(`   UserOp Hash: ${userOpHash}`);
-
     return userOpHash as string;
   } catch (error) {
-    console.error('❌ Error sending UserOperation:', error);
+    console.error('Error sending UserOperation:', error);
     throw new Error(`Failed to send UserOperation: ${(error as Error).message}`);
   }
 }
@@ -135,19 +118,13 @@ export async function getUserOperationReceipt(
 ): Promise<UserOperationReceipt | null> {
   try {
     validateConfig();
+
     const client = getBundlerClient();
-
-    console.log(`🔍 Checking UserOperation status...`);
-    console.log(`   UserOp Hash: ${userOpHash}`);
-
-    // Call Bundler RPC method: eth_getUserOperationReceipt
     const receipt = await client.request({
       method: 'eth_getUserOperationReceipt' as any,
       params: [userOpHash as Hash],
     });
-
     if (!receipt) {
-      console.log(`   Status: Pending (not yet included in a block)`);
       return null;
     }
 
@@ -160,13 +137,6 @@ export async function getUserOperationReceipt(
       actualGasUsed: (receipt as any).actualGasUsed || '0x0',
       logs: (receipt as any).receipt.logs || [],
     };
-
-    console.log(`✅ UserOperation confirmed`);
-    console.log(`   Transaction Hash: ${parsedReceipt.transactionHash}`);
-    console.log(`   Block Number: ${parsedReceipt.blockNumber}`);
-    console.log(`   Success: ${parsedReceipt.success}`);
-    console.log(`   Actual Gas Used: ${parsedReceipt.actualGasUsed}`);
-
     return parsedReceipt;
   } catch (error) {
     console.error('❌ Error getting UserOperation receipt:', error);

@@ -81,7 +81,6 @@ export const validateSponsorRequest = (
       return;
     }
 
-    // Store validated data in request object
     req.body = result.data;
     next();
   } catch (error) {
@@ -117,7 +116,6 @@ export const validateUserOperationRequest = (
       return;
     }
 
-    // Store validated data in request object
     req.body = result.data;
     next();
   } catch (error) {
