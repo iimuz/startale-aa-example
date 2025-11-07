@@ -7,28 +7,19 @@
  * 3. POST /api/user-operations - Submit signed UserOperation
  * 4. GET /api/user-operations/:hash - Poll for receipt
  *
- * Features:
- * - JSON cache system for resuming from failed steps
- * - Complete E2E flow through API endpoints
- * - Cache file: .api-test-cache.json
- *
  * Usage:
  * - Run tests: npm run test:integration
- * - Clean cache and restart: rm test/integration/.api-test-cache.json
  */
 
-import { describe, it, expect, beforeAll, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeAll } from '@jest/globals';
 import request from 'supertest';
 import { app } from '../../src/index';
 import { privateKeyToAccount } from 'viem/accounts';
 import { http } from 'viem';
 import { soneiumMinato } from 'viem/chains';
 import { toStartaleSmartAccount } from '@startale-scs/aa-sdk';
-import fs from 'fs';
-import path from 'path';
 
 // Test configuration
-const CACHE_FILE = path.join(__dirname, '.api-test-cache.json');
 const TEST_PRIVATE_KEY =
   process.env.TEST_PRIVATE_KEY ||
   '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
@@ -49,35 +40,7 @@ describe.only('API Integration Tests', () => {
   });
 
   describe('E2E UserOperation flow via API', () => {
-    let cache: any = {};
-
-    beforeAll(() => {
-      // Load cache file if it exists
-      if (fs.existsSync(CACHE_FILE)) {
-        cache = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf-8'));
-        console.log('📦 Loaded cache from previous run');
-        console.log(`   Cache file: ${CACHE_FILE}`);
-      } else {
-        console.log('🆕 Starting fresh (no cache found)');
-      }
-    });
-
-    afterEach(() => {
-      // Save cache after each step
-      fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2));
-      console.log('💾 Cache saved to:', CACHE_FILE);
-    });
-
     it('E2E: Sponsor, sign, and submit UserOperation via API', async () => {
-      // Skip if already completed
-      if (cache.receipt) {
-        console.log('⏭️  Test already completed');
-        console.log(`   Transaction Hash: ${cache.receipt.transactionHash}`);
-        console.log(`   Success: ${cache.receipt.success}`);
-        expect(cache.receipt).toBeDefined();
-        return;
-      }
-
       console.log('🚀 Starting E2E UserOperation flow via API...');
 
       // ===== Step 1: Create UserOperation =====
@@ -218,9 +181,6 @@ describe.only('API Integration Tests', () => {
         console.log(`   Block Number: ${receipt.blockNumber}`);
         console.log(`   Success: ${receipt.success}`);
         console.log(`   Actual Gas Used: ${receipt.actualGasUsed}`);
-
-        // Save to cache
-        cache.receipt = receipt;
 
         expect(receipt.transactionHash).toBeDefined();
         expect(receipt.blockNumber).toBeDefined();
