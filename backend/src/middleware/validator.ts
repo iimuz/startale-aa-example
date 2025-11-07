@@ -65,7 +65,7 @@ export const validateSponsorRequest = (
     const result = sponsorRequestSchema.safeParse(req.body);
 
     if (!result.success) {
-      const errors = result.error.issues.map((err: z.ZodIssue) => ({
+      const errors = result.error.issues.map((err: z.core.$ZodIssue) => ({
         field: err.path.join('.'),
         message: err.message,
       }));
@@ -101,7 +101,7 @@ export const validateUserOperationRequest = (
     const result = userOperationRequestSchema.safeParse(req.body);
 
     if (!result.success) {
-      const errors = result.error.issues.map((err: z.ZodIssue) => ({
+      const errors = result.error.issues.map((err: z.core.$ZodIssue) => ({
         field: err.path.join('.'),
         message: err.message,
       }));
@@ -137,7 +137,7 @@ export const validateUserOpHash = (
     const result = userOpHashParamSchema.safeParse(req.params);
 
     if (!result.success) {
-      const errors = result.error.issues.map((err: z.ZodIssue) => ({
+      const errors = result.error.issues.map((err: z.core.$ZodIssue) => ({
         field: err.path.join('.'),
         message: err.message,
       }));
