@@ -38,7 +38,7 @@ const CHAIN_ID = 1946; // Soneium Minato
 describe.only('API Integration Tests', () => {
   beforeAll(() => {
     // Verify that required environment variables are set
-    const requiredEnvVars = ['BUNDLER_URL', 'ENTRY_POINT_ADDRESS', 'CHAIN_ID', 'PAYMASTER_ID'];
+    const requiredEnvVars = ['BUNDLER_URL', 'CHAIN_ID', 'PAYMASTER_ID'];
     const missing = requiredEnvVars.filter((v) => !process.env[v]);
 
     if (missing.length > 0) {
