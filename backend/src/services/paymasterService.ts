@@ -6,13 +6,11 @@
  */
 
 import { http } from 'viem';
-import { createSCSPaymasterClient, toSCSSponsoredPaymasterContext } from '@startale-scs/aa-sdk';
+import { createSCSPaymasterClient, toSCSSponsoredPaymasterContext, ENTRY_POINT_ADDRESS } from '@startale-scs/aa-sdk';
 import type { UserOperation } from '../types/userOperation';
 
-// Environment variables
 const PAYMASTER_SERVICE_URL = process.env.PAYMASTER_SERVICE_URL;
 const PAYMASTER_ID = process.env.PAYMASTER_ID;
-const ENTRY_POINT_ADDRESS = process.env.ENTRY_POINT_ADDRESS;
 const CHAIN_ID = process.env.CHAIN_ID;
 
 /**
@@ -24,9 +22,6 @@ function validateConfig(): void {
   }
   if (!PAYMASTER_ID) {
     throw new Error('PAYMASTER_ID is not set in environment variables');
-  }
-  if (!ENTRY_POINT_ADDRESS) {
-    throw new Error('ENTRY_POINT_ADDRESS is not set in environment variables');
   }
   if (!CHAIN_ID) {
     throw new Error('CHAIN_ID is not set in environment variables');
@@ -116,7 +111,7 @@ export async function sponsorUserOperation(
 
       // Required fields for Paymaster API
       chainId: effectiveChainId,
-      entryPointAddress: ENTRY_POINT_ADDRESS! as `0x${string}`,
+      entryPointAddress: ENTRY_POINT_ADDRESS,
 
       // Paymaster context
       context,
@@ -192,7 +187,6 @@ export function isPaymasterConfigured(): boolean {
   return !!(
     PAYMASTER_SERVICE_URL &&
     PAYMASTER_ID &&
-    ENTRY_POINT_ADDRESS &&
     CHAIN_ID
   );
 }

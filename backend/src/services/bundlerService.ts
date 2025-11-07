@@ -6,12 +6,12 @@
  */
 
 import { createPublicClient, http, type Address, type Hash } from 'viem';
+import { ENTRY_POINT_ADDRESS } from '@startale-scs/aa-sdk';
 import type { UserOperation, UserOperationReceipt } from '../types/userOperation';
 
 // Environment variables
 const BUNDLER_URL = process.env.BUNDLER_URL;
 const BUNDLER_API_KEY = process.env.BUNDLER_API_KEY;
-const ENTRY_POINT_ADDRESS = process.env.ENTRY_POINT_ADDRESS;
 const CHAIN_ID = process.env.CHAIN_ID;
 
 /**
@@ -20,9 +20,6 @@ const CHAIN_ID = process.env.CHAIN_ID;
 function validateConfig(): void {
   if (!BUNDLER_URL) {
     throw new Error('BUNDLER_URL is not set in environment variables');
-  }
-  if (!ENTRY_POINT_ADDRESS) {
-    throw new Error('ENTRY_POINT_ADDRESS is not set in environment variables');
   }
   if (!CHAIN_ID) {
     throw new Error('CHAIN_ID is not set in environment variables');
@@ -183,5 +180,5 @@ export async function getUserOperationReceipt(
  * Check if Bundler service is properly configured
  */
 export function isBundlerConfigured(): boolean {
-  return !!(BUNDLER_URL && ENTRY_POINT_ADDRESS && CHAIN_ID);
+  return !!(BUNDLER_URL && CHAIN_ID);
 }
