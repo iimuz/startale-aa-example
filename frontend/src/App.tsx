@@ -3,6 +3,8 @@ import { http, createConfig, WagmiProvider } from 'wagmi';
 import { defineChain } from 'viem';
 import { injected } from 'wagmi/connectors';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { WalletConnect } from './components/WalletConnect';
+import { SendTransaction } from './components/SendTransaction';
 
 // Soneium Minato チェーン定義
 export const soneiumMinato = defineChain({
@@ -46,6 +48,9 @@ const App = () => {
         <div className="content">
           <h1>Startale AA Sample</h1>
           <p>Account Abstraction on Soneium Minato</p>
+
+          <WalletConnect />
+          <SendTransaction />
         </div>
       </QueryClientProvider>
     </WagmiProvider>
