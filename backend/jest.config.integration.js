@@ -17,3 +17,6 @@ module.exports = {
   silent: true,
   testTimeout: 30000,
 };
+
+// Set NODE_ENV to 'test' to prevent server startup during tests
+process.env.NODE_ENV = 'test';
