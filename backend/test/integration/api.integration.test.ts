@@ -41,8 +41,7 @@ describe.only('API Integration Tests', () => {
 
   describe('E2E UserOperation flow via API', () => {
     it('E2E: Sponsor, sign, and submit UserOperation via API', async () => {
-      console.log('Step 1: Creating UserOperation...');
-
+      // Create Smart Account and UserOperation
       const signer = privateKeyToAccount(TEST_PRIVATE_KEY as `0x${string}`);
       const smartAccount = await toStartaleSmartAccount({
         signer,
@@ -54,8 +53,7 @@ describe.only('API Integration Tests', () => {
       const { factory, factoryData } = await smartAccount.getFactoryArgs();
       const accountAddress = await smartAccount.getAddress();
       const nonce = await smartAccount.getNonce();
-      console.log(`Account: ${accountAddress}`);
-      console.log(`Nonce: 0x${nonce.toString(16)}`);
+      console.log(`Account: ${accountAddress}, Nonce: 0x${nonce.toString(16)}`);
 
       // Generate callData (dummy self-call that does nothing)
       const callData = await smartAccount.encodeExecute({
@@ -76,26 +74,28 @@ describe.only('API Integration Tests', () => {
         maxPriorityFeePerGas: '0x3b9aca00',
         signature: '0x', // Placeholder
       };
-
-      console.log('Step 2: Getting Paymaster sponsorship via API...');
       const sponsorResponse = await request(app)
         .post('/api/user-operations/sponsor')
         .send({ userOp, chainId: CHAIN_ID });
       if (sponsorResponse.status !== 200) {
-        console.log('Step 2 failed with status:', sponsorResponse.status);
-        console.log('Response body:', JSON.stringify(sponsorResponse.body, null, 2));
+        console.log(
+          'Step 2 failed with status:', sponsorResponse.status,
+          '\nResponse body:', JSON.stringify(sponsorResponse.body, null, 2)
+        );
       }
       expect(sponsorResponse.status).toBe(200);
       expect(sponsorResponse.body.success).toBe(true);
       expect(sponsorResponse.body.data.sponsoredUserOp).toBeDefined();
 
       const sponsoredUserOp = sponsorResponse.body.data.sponsoredUserOp;
-      console.log(`Paymaster: ${sponsoredUserOp.paymaster}`);
-      console.log(`Paymaster Data: ${sponsoredUserOp.paymasterData?.substring(0, 20)}...`);
+      console.log(
+        'Paymaster:', sponsoredUserOp.paymaster,
+        '\nPaymaster Data:', sponsoredUserOp.paymasterData?.substring(0, 20)
+      );
       expect(sponsoredUserOp.paymaster).toBeDefined();
       expect(sponsoredUserOp.paymasterData).toBeDefined();
 
-      console.log('Step 3: Signing UserOperation...');
+      // Sign the sponsored UserOperation
       const signature = await smartAccount.signUserOperation(sponsoredUserOp);
       const signedUserOp = {
         ...sponsoredUserOp,
@@ -105,13 +105,15 @@ describe.only('API Integration Tests', () => {
       expect(signature).toBeDefined();
       expect(signature).toMatch(/^0x[a-fA-F0-9]+$/);
 
-      console.log('Step 4: Submitting signed UserOperation via API...');
+      // Submit the signed UserOperation
       const submitResponse = await request(app)
         .post('/api/user-operations')
         .send({ userOp: signedUserOp, chainId: CHAIN_ID });
       if (submitResponse.status !== 200) {
-        console.log('Step 4 failed with status:', submitResponse.status);
-        console.log('Response body:', JSON.stringify(submitResponse.body, null, 2));
+        console.log(
+          'Step 4 failed with status:', submitResponse.status,
+          '\nResponse body:', JSON.stringify(submitResponse.body, null, 2)
+        );
       }
       expect(submitResponse.status).toBe(200);
       expect(submitResponse.body.success).toBe(true);
@@ -121,7 +123,7 @@ describe.only('API Integration Tests', () => {
       console.log(`UserOp Hash: ${userOpHash}`);
       expect(userOpHash).toMatch(/^0x[a-fA-F0-9]{64}$/);
 
-      console.log('Step 5: Polling for UserOperation receipt via API...');
+      // Poll for UserOperation receipt
       let receipt = null;
       let attempts = 0;
       const maxAttempts = 10;
@@ -134,8 +136,10 @@ describe.only('API Integration Tests', () => {
         const statusResponse = await request(app)
           .get(`/api/user-operations/${userOpHash}`);
         if (statusResponse.status !== 200) {
-          console.log('Step 5 failed with status:', statusResponse.status);
-          console.log('Response body:', JSON.stringify(statusResponse.body, null, 2));
+          console.log(
+            'Step 5 failed with status:', statusResponse.status,
+            'Response body:', JSON.stringify(statusResponse.body, null, 2)
+          );
         }
         expect(statusResponse.status).toBe(200);
         expect(statusResponse.body.success).toBe(true);
@@ -143,16 +147,16 @@ describe.only('API Integration Tests', () => {
         if (statusResponse.body.data.status === 'confirmed') {
           receipt = statusResponse.body.data.receipt;
         }
-
         attempts++;
       }
 
       if (receipt) {
-        console.log(`Transaction Hash: ${receipt.transactionHash}`);
-        console.log(`Block Number: ${receipt.blockNumber}`);
-        console.log(`Success: ${receipt.success}`);
-        console.log(`Actual Gas Used: ${receipt.actualGasUsed}`);
-
+        console.log(
+          'Transaction Hash:', receipt.transactionHash,
+          '\nBlock Number:', receipt.blockNumber,
+          '\nSuccess:', receipt.success,
+          '\nActual Gas Used:', receipt.actualGasUsed,
+        );
         expect(receipt.transactionHash).toBeDefined();
         expect(receipt.blockNumber).toBeDefined();
         expect(receipt.success).toBeDefined();

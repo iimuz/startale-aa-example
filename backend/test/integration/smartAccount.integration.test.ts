@@ -59,13 +59,13 @@ describe('Smart Account Integration Tests', () => {
         index,
       });
       const mockAddress = await mockAccount.getAddress();
+      console.log(
+        'EOA Address:', eoaAddress,
+        '\nReference Smart Account Address:', referenceAddress,
+        '\nMock Signer Address:', mockSigner.address,
+        '\nSmart Account Address (from mock):', mockAddress,
+      );
 
-      console.log(`
-        EOA Address: ${eoaAddress}
-        Reference Smart Account Address: ${referenceAddress}
-        Mock Signer Address: ${mockSigner.address}
-        Smart Account Address (from mock): ${mockAddress}
-      `)
       expect(mockAddress).toBe(referenceAddress);
     });
   });
