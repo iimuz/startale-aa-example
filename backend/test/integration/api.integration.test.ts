@@ -41,15 +41,9 @@ describe.only('API Integration Tests', () => {
 
   describe('E2E UserOperation flow via API', () => {
     it('E2E: Sponsor, sign, and submit UserOperation via API', async () => {
-      console.log('🚀 Starting E2E UserOperation flow via API...');
+      console.log('Step 1: Creating UserOperation...');
 
-      // ===== Step 1: Create UserOperation =====
-      console.log('\n📝 Step 1: Creating UserOperation...');
-
-      // Create signer from test private key
       const signer = privateKeyToAccount(TEST_PRIVATE_KEY as `0x${string}`);
-
-      // Create SmartAccount using SDK
       const smartAccount = await toStartaleSmartAccount({
         signer,
         chain: soneiumMinato,
@@ -57,13 +51,11 @@ describe.only('API Integration Tests', () => {
         index: BigInt(999),
       });
 
-      // Get factory and factoryData for undeployed account
       const { factory, factoryData } = await smartAccount.getFactoryArgs();
       const accountAddress = await smartAccount.getAddress();
       const nonce = await smartAccount.getNonce();
-
-      console.log(`   Account: ${accountAddress}`);
-      console.log(`   Nonce: 0x${nonce.toString(16)}`);
+      console.log(`Account: ${accountAddress}`);
+      console.log(`Nonce: 0x${nonce.toString(16)}`);
 
       // Generate callData (dummy self-call that does nothing)
       const callData = await smartAccount.encodeExecute({
@@ -71,8 +63,6 @@ describe.only('API Integration Tests', () => {
         value: 0n,
         data: '0x',
       });
-
-      // Build UserOperation (without signature)
       const userOp = {
         sender: accountAddress,
         nonce: `0x${nonce.toString(16)}`,
@@ -87,85 +77,67 @@ describe.only('API Integration Tests', () => {
         signature: '0x', // Placeholder
       };
 
-      console.log('✅ Step 1 completed: UserOperation created');
-
-      // ===== Step 2: Get Paymaster sponsorship via API =====
-      console.log('\n📤 Step 2: Getting Paymaster sponsorship via API...');
-
+      console.log('Step 2: Getting Paymaster sponsorship via API...');
       const sponsorResponse = await request(app)
         .post('/api/user-operations/sponsor')
-        .send({ userOp, chainId: CHAIN_ID })
-        .expect(200);
-
+        .send({ userOp, chainId: CHAIN_ID });
+      if (sponsorResponse.status !== 200) {
+        console.log('Step 2 failed with status:', sponsorResponse.status);
+        console.log('Response body:', JSON.stringify(sponsorResponse.body, null, 2));
+      }
+      expect(sponsorResponse.status).toBe(200);
       expect(sponsorResponse.body.success).toBe(true);
       expect(sponsorResponse.body.data.sponsoredUserOp).toBeDefined();
 
       const sponsoredUserOp = sponsorResponse.body.data.sponsoredUserOp;
-
-      console.log('✅ Step 2 completed:');
-      console.log(`   Paymaster: ${sponsoredUserOp.paymaster}`);
-      console.log(`   Paymaster Data: ${sponsoredUserOp.paymasterData?.substring(0, 20)}...`);
-
+      console.log(`Paymaster: ${sponsoredUserOp.paymaster}`);
+      console.log(`Paymaster Data: ${sponsoredUserOp.paymasterData?.substring(0, 20)}...`);
       expect(sponsoredUserOp.paymaster).toBeDefined();
       expect(sponsoredUserOp.paymasterData).toBeDefined();
 
-      // ===== Step 3: Sign the UserOperation =====
-      console.log('\n✍️  Step 3: Signing UserOperation...');
-
+      console.log('Step 3: Signing UserOperation...');
       const signature = await smartAccount.signUserOperation(sponsoredUserOp);
-
       const signedUserOp = {
         ...sponsoredUserOp,
         signature,
       };
-
-      console.log('✅ Step 3 completed:');
-      console.log(`   Signature: ${signature.substring(0, 20)}...`);
-
+      console.log(`Signature: ${signature.substring(0, 20)}...`);
       expect(signature).toBeDefined();
       expect(signature).toMatch(/^0x[a-fA-F0-9]+$/);
 
-      // ===== Step 4: Submit signed UserOperation via API =====
-      console.log('\n📤 Step 4: Submitting signed UserOperation via API...');
-
+      console.log('Step 4: Submitting signed UserOperation via API...');
       const submitResponse = await request(app)
         .post('/api/user-operations')
         .send({ userOp: signedUserOp, chainId: CHAIN_ID });
-
-      // Debug: Display response for troubleshooting
       if (submitResponse.status !== 200) {
-        console.log('\n❌ Step 4 failed with status:', submitResponse.status);
+        console.log('Step 4 failed with status:', submitResponse.status);
         console.log('Response body:', JSON.stringify(submitResponse.body, null, 2));
       }
-
       expect(submitResponse.status).toBe(200);
       expect(submitResponse.body.success).toBe(true);
       expect(submitResponse.body.data.userOpHash).toBeDefined();
 
       const userOpHash = submitResponse.body.data.userOpHash;
-
-      console.log('✅ Step 4 completed:');
-      console.log(`   UserOp Hash: ${userOpHash}`);
-
+      console.log(`UserOp Hash: ${userOpHash}`);
       expect(userOpHash).toMatch(/^0x[a-fA-F0-9]{64}$/);
 
-      // ===== Step 5: Poll for UserOperation receipt via API =====
-      console.log('\n⏳ Step 5: Polling for UserOperation receipt via API...');
-
+      console.log('Step 5: Polling for UserOperation receipt via API...');
       let receipt = null;
       let attempts = 0;
       const maxAttempts = 10;
-
       while (!receipt && attempts < maxAttempts) {
         if (attempts > 0) {
-          console.log(`   Polling attempt ${attempts}/${maxAttempts}...`);
-          await new Promise((resolve) => setTimeout(resolve, 3000)); // Wait 3 seconds
+          console.log(`Polling attempt ${attempts}/${maxAttempts}...`);
+          await new Promise((resolve) => setTimeout(resolve, 3000));
         }
 
         const statusResponse = await request(app)
-          .get(`/api/user-operations/${userOpHash}`)
-          .expect(200);
-
+          .get(`/api/user-operations/${userOpHash}`);
+        if (statusResponse.status !== 200) {
+          console.log('Step 5 failed with status:', statusResponse.status);
+          console.log('Response body:', JSON.stringify(statusResponse.body, null, 2));
+        }
+        expect(statusResponse.status).toBe(200);
         expect(statusResponse.body.success).toBe(true);
 
         if (statusResponse.body.data.status === 'confirmed') {
@@ -176,17 +148,16 @@ describe.only('API Integration Tests', () => {
       }
 
       if (receipt) {
-        console.log('✅ Step 5 completed:');
-        console.log(`   Transaction Hash: ${receipt.transactionHash}`);
-        console.log(`   Block Number: ${receipt.blockNumber}`);
-        console.log(`   Success: ${receipt.success}`);
-        console.log(`   Actual Gas Used: ${receipt.actualGasUsed}`);
+        console.log(`Transaction Hash: ${receipt.transactionHash}`);
+        console.log(`Block Number: ${receipt.blockNumber}`);
+        console.log(`Success: ${receipt.success}`);
+        console.log(`Actual Gas Used: ${receipt.actualGasUsed}`);
 
         expect(receipt.transactionHash).toBeDefined();
         expect(receipt.blockNumber).toBeDefined();
         expect(receipt.success).toBeDefined();
       } else {
-        console.log('⚠️  Receipt not available yet (may need more time to confirm)');
+        console.log('Receipt not available yet (may need more time to confirm)');
         throw new Error('UserOperation receipt not found after polling');
       }
     }, 60000); // 60 second timeout for the entire test
